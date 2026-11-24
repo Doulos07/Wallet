@@ -30,7 +30,7 @@ public class AdelantoSueldo {
     @Builder.Default
     private boolean descontado = false;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false)
     @JoinColumn(nullable = false, name = "pago_id")
     private Gasto pago;
 

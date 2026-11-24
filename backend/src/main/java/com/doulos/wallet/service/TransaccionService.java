@@ -28,6 +28,8 @@ public class TransaccionService {
     private final CategoriaRepository categoriaRepository;
     private final MetodoPagoRepository metodoPagoRepository;
     private final AsientoRepository asientoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final RegistroExtraRepository registroExtraRepository;
 
     @Transactional
     public TransaccionResponseDTO registrarGasto(CrearGastoDTO dto, Long usuarioId) {
@@ -114,7 +116,7 @@ public class TransaccionService {
         return TransaccionResponseDTO.fromEntity(guardada);
     }
 
-    // Valida existencia, pertenencia al usuario y que no sea la cuenta externa
+    // Válida existencia, pertenencia al usuario y que no sea la cuenta externa
     private Cuenta obtenerCuentaValida(Long cuentaId, Long usuarioId) {
         Cuenta cuenta = cuentaRepository.findById(cuentaId)
                 .orElseThrow(() -> new EntityNotFoundException("Cuenta no encontrada."));
@@ -151,8 +153,13 @@ public class TransaccionService {
             LocalDate hasta,
             Pageable pageable) {
 
-        LocalDateTime fechaDesde = (desde != null) ? desde.atStartOfDay() : null;
-        LocalDateTime fechaHasta = (hasta != null) ? hasta.atTime(LocalTime.MAX) : null;
+        LocalDateTime fechaDesde = (desde != null)
+                ? desde.atStartOfDay()
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
+
+        LocalDateTime fechaHasta = (hasta != null)
+                ? hasta.atTime(LocalTime.MAX)
+                : LocalDateTime.of(2100, 12, 31, 23, 59, 59);
 
         return transaccionRepository
                 .buscarPorUsuarioConFiltros(usuarioId, cuentaId, estadoNegocio, estadoBancario, fechaDesde, fechaHasta, pageable)
@@ -168,17 +175,15 @@ public class TransaccionService {
             throw new AccessDeniedException("No tenés permiso para anular esta transacción.");
         }
 
-        // Valida que no esté anulada previamente y actualiza estadoNegocio a ANULADO
+        // Marca la transacción como anulada
         tx.anular();
 
-        // Genera y persiste el contra-asiento de partida doble
+        // Genera contra-asiento e impacta saldos invertidos solo si estaba autorizada
         if (tx.getAsiento() != null) {
             Asiento contraAsiento = tx.getAsiento().generarContraAsiento();
+            contraAsiento.impactarSaldos();
             asientoRepository.save(contraAsiento);
         }
-
-        // Revierte los saldos según el subtipo de transacción
-        revertirSaldos(tx);
 
         Transaccion guardada = transaccionRepository.save(tx);
         return TransaccionResponseDTO.fromEntity(guardada);
@@ -188,14 +193,51 @@ public class TransaccionService {
         Cuenta origen = tx.getCuentaOrigen();
         Long monto = tx.getMontoCentavos();
 
-        if (tx instanceof Gasto) {
-            origen.setSaldoCentavos(origen.getSaldoCentavos() + monto);
-        } else if (tx instanceof Ingreso) {
-            origen.setSaldoCentavos(origen.getSaldoCentavos() - monto);
-        } else if (tx instanceof Transferencia transferencia) {
-            Cuenta destino = transferencia.getCuentaDestino();
-            origen.setSaldoCentavos(origen.getSaldoCentavos() + monto);
-            destino.setSaldoCentavos(destino.getSaldoCentavos() - monto);
+        switch (tx) {
+            case Gasto gasto -> origen.setSaldoCentavos(origen.getSaldoCentavos() + monto);
+            case Ingreso ingreso -> origen.setSaldoCentavos(origen.getSaldoCentavos() - monto);
+            case Transferencia transferencia -> {
+                Cuenta destino = transferencia.getCuentaDestino();
+                origen.setSaldoCentavos(origen.getSaldoCentavos() + monto);
+                destino.setSaldoCentavos(destino.getSaldoCentavos() - monto);
+            }
+            default -> {
+            }
         }
+    }
+
+    @Transactional
+    public TransaccionResponseDTO autorizarTransaccion(Long transaccionId, Long usuarioId) {
+        Transaccion tx = transaccionRepository.findById(transaccionId)
+                .orElseThrow(() -> new EntityNotFoundException("Transacción no encontrada con ID: " + transaccionId));
+
+        if (!tx.getCuentaOrigen().getUsuario().getId().equals(usuarioId)) {
+            throw new AccessDeniedException("No tenés permiso para autorizar esta transacción.");
+        }
+        if (tx.getEstadoNegocio() == EstadoTransaccion.ANULADO) {
+            throw new IllegalStateException("No se puede autorizar una transacción anulada.");
+        }
+        if (tx.getAsiento() != null || tx.getEstadoBancario() != EstadoConciliacion.NO_LIQUIDADO) {
+            throw new IllegalStateException("La transacción ya se encuentra autorizada.");
+        }
+        if (tx.getPagoPlanificado() != null && tx.getPagoPlanificado().obtenerPlantilla() == null) {
+            throw new IllegalStateException("No se puede autorizar directamente la plantilla de un pago planificado.");
+        }
+
+        // Registra la fecha efectiva en que se aprueba y debita el movimiento
+        tx.setFecha(LocalDateTime.now());
+        tx.setEstadoBancario(EstadoConciliacion.LIQUIDADO);
+
+        Asiento asiento = tx.generarAsiento();
+        tx.setAsiento(asiento);
+        asiento.impactarSaldos();
+
+        if (tx instanceof Gasto gasto) {
+            registroExtraRepository.findByPagoId(gasto.getId())
+                    .forEach(extra -> extra.liquidarCon(gasto));
+        }
+
+        Transaccion guardada = transaccionRepository.save(tx);
+        return TransaccionResponseDTO.fromEntity(guardada);
     }
 }

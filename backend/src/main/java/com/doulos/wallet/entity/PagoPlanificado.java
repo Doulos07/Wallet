@@ -1,5 +1,6 @@
 package com.doulos.wallet.entity;
 
+import com.doulos.wallet.entity.enums.EstadoConciliacion;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -66,10 +67,11 @@ public class PagoPlanificado {
         }
     }
 
-    // Obtiene la transacción moldé (la única que no tiene asiento contable)
+    // Obtiene la transacción moldé (la única sin asiento y que no está pendiente de autorizar)
     public Transaccion obtenerPlantilla() {
         return this.transaccionesGeneradas.stream()
-                .filter(t -> t.getAsiento() == null)
+                .filter(t -> t.getAsiento() == null
+                        && t.getEstadoBancario() != EstadoConciliacion.NO_LIQUIDADO)
                 .findFirst()
                 .orElse(null);
     }
@@ -82,9 +84,12 @@ public class PagoPlanificado {
         }
     }
 
-    // Clona la plantilla, ajusta montos de nómina si aplica, genera el asiento y avanza estado
+    // Clona la plantilla, ajusta montos de nómina y deja el movimiento pendiente de autorización
     public void ejecutar(LocalDate hoy) {
         Transaccion plantilla = obtenerPlantilla();
+        if (plantilla == null) {
+            return;
+        }
         long montoFinal = plantilla.getMontoCentavos();
 
         if (this.empleado != null) {
@@ -94,11 +99,12 @@ public class PagoPlanificado {
         if (montoFinal > 0L) {
             Transaccion nueva = plantilla.clonarParaEjecucion(hoy.atStartOfDay());
             nueva.setMontoCentavos(montoFinal);
-            nueva.setAsiento(nueva.generarAsiento());
+            nueva.setEstadoBancario(EstadoConciliacion.NO_LIQUIDADO);
+            nueva.setAsiento(null);
 
             if (!this.registrosExtra.isEmpty()) {
                 Gasto gastoExtras = (Gasto) nueva;
-                this.registrosExtra.forEach(extra -> extra.liquidarCon(gastoExtras));
+                this.registrosExtra.forEach(extra -> extra.setPago(gastoExtras));
             }
 
             agregarTransaccion(nueva);

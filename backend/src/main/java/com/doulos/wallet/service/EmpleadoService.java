@@ -176,6 +176,12 @@ public class EmpleadoService {
         return EmpleadoResponseDTO.fromEntity(empleado);
     }
 
+    @Transactional(readOnly = true)
+    public EmpleadoDetalleResponseDTO obtenerDetalle(Long empleadoId, Long jefeId) {
+        Empleado empleado = obtenerEmpleadoPropio(empleadoId, jefeId);
+        return EmpleadoDetalleResponseDTO.fromEntity(empleado);
+    }
+
     @Transactional
     public EmpleadoResponseDTO actualizarCondiciones(Long empleadoId, ActualizarEmpleadoDTO dto, Long jefeId) {
         Empleado empleado = obtenerEmpleadoActivo(empleadoId, jefeId);
@@ -187,9 +193,25 @@ public class EmpleadoService {
 
         if (dto.diaPagoSueldo() != null) {
             empleado.setDiaPagoSueldo(dto.diaPagoSueldo());
+            if (empleado.getPagoPlanificadoSueldo() != null && empleado.getPagoPlanificadoSueldo().isActivo()) {
+                LocalDate nuevaFechaSueldo = calcularProximaFecha(dto.diaPagoSueldo(), 10);
+                empleado.getPagoPlanificadoSueldo().setFecha(nuevaFechaSueldo);
+                if (empleado.getPagoPlanificadoSueldo().obtenerPlantilla() != null) {
+                    empleado.getPagoPlanificadoSueldo().obtenerPlantilla()
+                            .setFecha(nuevaFechaSueldo.atStartOfDay());
+                }
+            }
         }
+
         if (dto.diaPagoExtras() != null) {
             empleado.setDiaPagoExtras(dto.diaPagoExtras());
+            empleado.obtenerPagoExtrasActivo().ifPresent(pagoExtras -> {
+                LocalDate nuevaFechaExtras = calcularProximaFecha(dto.diaPagoExtras(), 20);
+                pagoExtras.setFecha(nuevaFechaExtras);
+                if (pagoExtras.obtenerPlantilla() != null) {
+                    pagoExtras.obtenerPlantilla().setFecha(nuevaFechaExtras.atStartOfDay());
+                }
+            });
         }
 
         // Sincroniza el nuevo sueldo base en la plantilla planificada

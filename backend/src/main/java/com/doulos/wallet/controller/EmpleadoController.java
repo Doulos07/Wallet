@@ -35,6 +35,14 @@ public class EmpleadoController {
         return ResponseEntity.ok(empleadoService.listarActivos(jefe.getId()));
     }
 
+    @GetMapping("/{empleadoId}/detalle")
+    public ResponseEntity<EmpleadoDetalleResponseDTO> obtenerDetalle(
+            @PathVariable Long empleadoId,
+            @AuthenticationPrincipal Usuario jefe
+    ) {
+        return ResponseEntity.ok(empleadoService.obtenerDetalle(empleadoId, jefe.getId()));
+    }
+
     @PostMapping("/{empleadoId}/extras")
     public ResponseEntity<Void> registrarExtra(
             @PathVariable Long empleadoId,

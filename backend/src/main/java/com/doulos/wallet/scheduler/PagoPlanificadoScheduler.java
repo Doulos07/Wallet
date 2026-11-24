@@ -19,6 +19,7 @@ public class PagoPlanificadoScheduler {
     private final PagoPlanificadoService pagoPlanificadoService;
 
     // Ejecuta todos los días a las 00:05:00 hora Argentina
+    // @Scheduled(cron = "0 * * * * *", zone = "America/Argentina/Buenos_Aires") cada minuto
     @Scheduled(cron = "0 5 0 * * *", zone = "America/Argentina/Buenos_Aires")
     public void procesarPagosDelDia() {
         LocalDate hoy = LocalDate.now(ZONA_ARGENTINA);

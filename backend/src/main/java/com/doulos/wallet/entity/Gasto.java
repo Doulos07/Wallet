@@ -1,5 +1,6 @@
 package com.doulos.wallet.entity;
 
+import com.doulos.wallet.entity.enums.EstadoConciliacion;
 import com.doulos.wallet.entity.enums.TipoMovimiento;
 import jakarta.persistence.*;
 import lombok.NoArgsConstructor;
@@ -27,8 +28,7 @@ public class Gasto extends Transaccion {
         asiento.agregarLinea(this.getCuentaDestino(), this.getMontoCentavos(), TipoMovimiento.CREDITO);
         return asiento;
     }
-
-    // En Gasto.java
+    
     @Override
     public Transaccion clonarParaEjecucion(LocalDateTime fechaEjecucion) {
         return Gasto.builder()
@@ -37,6 +37,7 @@ public class Gasto extends Transaccion {
                 .fecha(fechaEjecucion)
                 .tercero(getTercero())
                 .garantiaMeses(getGarantiaMeses())
+                .estadoBancario(EstadoConciliacion.NO_LIQUIDADO)
                 .cuentaOrigen(getCuentaOrigen())
                 .cuentaDestino(getCuentaDestino())
                 .categoria(getCategoria())

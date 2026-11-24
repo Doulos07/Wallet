@@ -15,6 +15,8 @@ public record EmpleadoResponseDTO(
         Integer horasMensualesBase,
         BigDecimal valorHoraExtra,
         TipoPagoHoraExtra tipoHoraExtra,
+        Integer diaPagoSueldo,
+        Integer diaPagoExtras,
         boolean activo,
         LocalDate proximoPagoSueldo
 ) {
@@ -32,6 +34,8 @@ public record EmpleadoResponseDTO(
                 e.getHorasMensualesBase(),
                 e.getValorHoraExtra(),
                 e.getTipoHoraExtra(),
+                e.getDiaPagoSueldo(),
+                e.getDiaPagoExtras(),
                 e.isActivo(),
                 proximaFecha
         );

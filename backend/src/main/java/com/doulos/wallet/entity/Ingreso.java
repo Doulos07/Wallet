@@ -1,6 +1,7 @@
 // Ingreso.java
 package com.doulos.wallet.entity;
 
+import com.doulos.wallet.entity.enums.EstadoConciliacion;
 import com.doulos.wallet.entity.enums.TipoMovimiento;
 import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
@@ -30,7 +31,6 @@ public class Ingreso extends Transaccion {
         return asiento;
     }
 
-    // En Ingreso.java
     @Override
     public Transaccion clonarParaEjecucion(LocalDateTime fechaEjecucion) {
         return Ingreso.builder()
@@ -38,6 +38,7 @@ public class Ingreso extends Transaccion {
                 .descripcion(getDescripcion())
                 .fecha(fechaEjecucion)
                 .tercero(getTercero())
+                .estadoBancario(EstadoConciliacion.NO_LIQUIDADO)
                 .cuentaOrigen(getCuentaOrigen())
                 .cuentaDestino(getCuentaDestino())
                 .categoria(getCategoria())

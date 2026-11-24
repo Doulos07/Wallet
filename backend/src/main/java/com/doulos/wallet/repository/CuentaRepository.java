@@ -21,4 +21,6 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 
     // Trae solo las cuentas reales y activas del usuario
     List<Cuenta> findByUsuarioIdAndTipoNotAndEstadoTrue(Long usuarioId, TipoCuenta tipoExcluido);
+
+    boolean existsByNombreIgnoreCaseAndUsuarioIdAndEstadoTrue(String nombre, Long usuarioId);
 }

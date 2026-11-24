@@ -76,4 +76,11 @@ public class TransaccionController {
         TransaccionResponseDTO anulada = transaccionService.anularTransaccion(id, usuario.getId());
         return ResponseEntity.ok(anulada);
     }
+
+    @PatchMapping("/{id}/autorizar")
+    public ResponseEntity<TransaccionResponseDTO> autorizarTransaccion(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(transaccionService.autorizarTransaccion(id, usuario.getId()));
+    }
 }

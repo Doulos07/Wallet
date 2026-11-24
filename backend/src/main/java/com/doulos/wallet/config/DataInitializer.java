@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +21,27 @@ public class DataInitializer implements ApplicationRunner {
 
     private final CategoriaRepository categoriaRepository;
     private final MetodoPagoRepository metodoPagoRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        asegurarIndiceCuentasActivas();
         cargarCategoriasIniciales();
         cargarMetodosPagoIniciales();
+    }
+
+    private void asegurarIndiceCuentasActivas() {
+        jdbcTemplate.execute("""
+                ALTER TABLE cuentas
+                DROP CONSTRAINT IF EXISTS ukqejv97kgk2upcbetwfipqyedj
+                """);
+
+        jdbcTemplate.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uk_cuentas_activas_usuario_nombre
+                ON cuentas (usuario_id, LOWER(nombre))
+                WHERE estado = true
+                """);
     }
 
     private void cargarCategoriasIniciales() {

@@ -1,5 +1,6 @@
 package com.doulos.wallet.repository;
 
+import com.doulos.wallet.entity.RegistroExtra;
 import com.doulos.wallet.entity.Transaccion;
 import com.doulos.wallet.entity.enums.EstadoConciliacion;
 import com.doulos.wallet.entity.enums.EstadoTransaccion;
@@ -22,16 +23,19 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
     @Query("SELECT t FROM Transaccion t WHERE t.cuentaOrigen.id = :cuentaId AND t.fecha BETWEEN :inicio AND :fin")
     List<Transaccion> buscarHistorialPorFecha(@Param("cuentaId") Long cuentaId, @Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin);
 
-    // Lista transacciones del usuario filtrando por cuenta, estados y rango de fechas
+    // Lista transacciones del usuario solo sobre cuentas activas
     @EntityGraph(attributePaths = {"cuentaOrigen", "cuentaDestino", "categoria", "metodoPago"})
     @Query("""
             SELECT t FROM Transaccion t
             WHERE t.cuentaOrigen.usuario.id = :usuarioId
+              AND (t.asiento IS NOT NULL OR t.estadoBancario = EstadoConciliacion.NO_LIQUIDADO)
+              AND t.cuentaOrigen.estado = true
+              AND t.cuentaDestino.estado = true
               AND (:cuentaId IS NULL OR t.cuentaOrigen.id = :cuentaId OR t.cuentaDestino.id = :cuentaId)
               AND (:estadoNegocio IS NULL OR t.estadoNegocio = :estadoNegocio)
               AND (:estadoBancario IS NULL OR t.estadoBancario = :estadoBancario)
-              AND (:desde IS NULL OR t.fecha >= :desde)
-              AND (:hasta IS NULL OR t.fecha <= :hasta)
+              AND t.fecha >= :desde
+              AND t.fecha <= :hasta
             """)
     Page<Transaccion> buscarPorUsuarioConFiltros(
             @Param("usuarioId") Long usuarioId,
@@ -42,4 +46,6 @@ public interface TransaccionRepository extends JpaRepository<Transaccion, Long> 
             @Param("hasta") LocalDateTime hasta,
             Pageable pageable
     );
+
+    boolean existsByCuentaOrigenIdOrCuentaDestinoId(Long cuentaOrigenId, Long cuentaDestinoId);
 }

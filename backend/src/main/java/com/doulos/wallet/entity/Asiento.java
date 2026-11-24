@@ -23,16 +23,16 @@ public class Asiento {
     @Column(nullable = false)
     private LocalDateTime fecha;
 
+    // Solo el asiento original apunta a la transacción; el contra-asiento queda en null
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaccion_id", nullable = false, unique = true)
+    @JoinColumn(name = "transaccion_id", unique = true)
     private Transaccion transaccion;
 
     @Builder.Default
     @OneToMany(mappedBy = "asiento", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LineaAsiento> lineas = new ArrayList<>();
 
-    // Relación recursiva: Un asiento puede tener otro asiento que lo anula.
-    // Es opcional (no tiene nullable = false) porque la mayoría de los asientos no se anulan.
+    // Referencia al contra-asiento cuando este movimiento fue anulado
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contra_asiento_id")
     private Asiento contraAsiento;
@@ -53,7 +53,7 @@ public class Asiento {
         this.lineas.forEach(LineaAsiento::impactarEnCuenta);
     }
 
-    // En Asiento.java
+    // Genera el contra-asiento invirtiendo débitos y créditos y lo vincula al asiento original
     public Asiento generarContraAsiento() {
         Asiento contra = Asiento.builder()
                 .fecha(LocalDateTime.now())
@@ -73,6 +73,8 @@ public class Asiento {
 
             contra.getLineas().add(contraLinea);
         }
+
+        this.contraAsiento = contra;
         return contra;
     }
 }
